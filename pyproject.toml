@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "advice-engine"
+version = "0.1.0"
+description = "Financial advice engine"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas",
+  "numpy",
+  "scikit-learn",
+  "xgboost",
+  "joblib",
+  "fastapi",
+  "uvicorn",
+  "jinja2",
+  "python-multipart"
+]
+
+[tool.setuptools]
+# Explicitly package only the library folder
+packages = ["advice_engine"]
