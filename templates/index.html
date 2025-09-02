@@ -43,8 +43,9 @@
         <button type="submit">Get advice</button>
       </form>
 
-      {% if result %}
+      {% if result or advice or snippets %}
       <div class="result">
+        {% if result %}
         <div class="kv">
           <div><strong>Predicted Savings:</strong></div><div>{{ result.Pred_Savings_XGB }}</div>
           {% if result.Cluster is not none %}
@@ -58,9 +59,12 @@
             <div><strong>Goal Label:</strong></div><div>{{ result.Goal_Label }}</div>
           {% endif %}
         </div>
+        {% endif %}
+
         {% if advice %}
           <div class="advice"><strong>Advice:</strong> {{ advice }}</div>
         {% endif %}
+
         {% if snippets %}
           <div class="advice" style="margin-top:.75rem;">
             <strong>Why this advice?</strong>
