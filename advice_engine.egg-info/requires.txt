@@ -11,3 +11,11 @@ chromadb
 sentence-transformers
 PyYAML
 markdown
+streamlit
+watchdog
+langchain
+langchain-core
+langchain-huggingface
+transformers
+accelerate
+sentencepiece

@@ -1,0 +1,24 @@
+💰 Savings Estimation
+“I earn ₹80k per month and spend ₹55k. How much can I save?”
+“My annual income is ₹9,60,000 and expenses are ₹6,00,000. What’s my savings profile?”
+“If I cut entertainment by 20%, how much extra can I save?”
+🎯 Goal Planning
+“I want to save ₹10k per month. Can I reach that goal with my current spending?”
+“At age 30, what financial goals should I target?”
+“Will I be able to save enough for retirement if I earn ₹1.2M and spend ₹70k monthly?”
+🛡 Insurance / Risk
+“Do I need life insurance?”
+“How much health insurance cover should I take?”
+“I have dependents — what type of insurance is best?”
+📊 Financial Profile & Personas
+“Summarize my financial health if I earn ₹60k and spend ₹40k.”
+“Which financial persona do I belong to with 90k income and 65k spend?”
+“What’s my cluster profile if I earn ₹50k and spend ₹35k?”
+⚡ Emergency Fund & Debt
+“How big should my emergency fund be?”
+“What’s the avalanche method for debt repayment?”
+“I have loans — should I prioritize savings or debt repayment?”
+🧠 Open Knowledge (RAG)
+“Explain the 50/30/20 rule.”
+“What’s the difference between avalanche and snowball debt repayment?”
+“Why is retirement planning important?”

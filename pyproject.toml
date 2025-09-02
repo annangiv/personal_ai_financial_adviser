@@ -20,7 +20,15 @@ dependencies = [
   "chromadb",
   "sentence-transformers",
   "PyYAML",
-  "markdown"
+  "markdown",
+  "streamlit",
+  "watchdog",
+  "langchain",
+  "langchain-core",
+  "langchain-huggingface",
+  "transformers",
+  "accelerate",
+  "sentencepiece"
 ]
 
 [tool.setuptools]

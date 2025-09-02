@@ -16,3 +16,11 @@ Requires-Dist: chromadb
 Requires-Dist: sentence-transformers
 Requires-Dist: PyYAML
 Requires-Dist: markdown
+Requires-Dist: streamlit
+Requires-Dist: watchdog
+Requires-Dist: langchain
+Requires-Dist: langchain-core
+Requires-Dist: langchain-huggingface
+Requires-Dist: transformers
+Requires-Dist: accelerate
+Requires-Dist: sentencepiece

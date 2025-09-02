@@ -1,0 +1,26 @@
+{
+  "regressor_columns": [
+    "Income",
+    "Disposable_Income",
+    "Groceries",
+    "Transport",
+    "Entertainment",
+    "Age",
+    "Occupation_Professional",
+    "Occupation_Retired",
+    "Occupation_Self_Employed",
+    "Occupation_Student",
+    "City_Tier_Tier_1",
+    "City_Tier_Tier_2",
+    "City_Tier_Tier_3"
+  ],
+  "cluster_features": [
+    "Income",
+    "Disposable_Income",
+    "Pred_Savings_XGB",
+    "Groceries",
+    "Transport",
+    "Entertainment"
+  ],
+  "classifier_columns": null
+}
