@@ -53,13 +53,28 @@
           {% if result.Persona %}
             <div><strong>Persona:</strong></div><div>{{ result.Persona }}</div>
           {% endif %}
-          {% if result.Goal_Prob is not none %}
+          {% if result.Goal_Prob is defined and result.Goal_Prob is not none %}
             <div><strong>Goal Probability:</strong></div><div>{{ result.Goal_Prob }}</div>
             <div><strong>Goal Label:</strong></div><div>{{ result.Goal_Label }}</div>
           {% endif %}
         </div>
         {% if advice %}
           <div class="advice"><strong>Advice:</strong> {{ advice }}</div>
+        {% endif %}
+        {% if snippets %}
+          <div class="advice" style="margin-top:.75rem;">
+            <strong>Why this advice?</strong>
+            <ul style="margin:0.5rem 0 0 1rem;">
+              {% for s in snippets %}
+                <li>
+                  {{ s.text[:220] }}{% if s.text|length > 220 %}…{% endif %}
+                  <div style="font-size:0.9em; opacity:.7;">
+                    Source: {{ s.title }} ({{ s.source }}#{{ s.chunk }})
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
         {% endif %}
       </div>
       {% endif %}

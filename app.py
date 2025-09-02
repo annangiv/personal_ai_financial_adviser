@@ -4,13 +4,54 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import pandas as pd
 import re, math
+from rag import KBRetriever
 
 from advice_engine.pipeline import run_advice_engine
 
+kb = None
+
 app = FastAPI(title="Financial Advice Engine")
+
+@app.on_event("startup")
+def _init_kb():
+    global kb
+    try:
+        kb = KBRetriever()
+        # quick sanity: count docs
+        coll = kb.coll
+        count = coll.count() if hasattr(coll, "count") else "?"
+        print(f"[KB] retriever ready. collection='finance_kb' docs={count}")
+    except Exception as e:
+        kb = None
+        print(f"[KB] disabled: {e}")
+
+@app.get("/kb-health")
+def kb_health():
+    ok = kb is not None
+    meta = {}
+    try:
+        if kb:
+            meta["collection"] = "finance_kb"
+            meta["count"] = kb.coll.count() if hasattr(kb.coll, "count") else None
+            # tiny probe
+            res = kb.search("budget rule", k=1)
+            meta["probe_hits"] = len(res)
+    except Exception as e:
+        meta["error"] = str(e)
+        ok = False
+    return {"ok": ok, **meta}        
+
 templates = Jinja2Templates(directory="templates")
 
 # ---------- helpers ----------
+
+def retrieve_snippets(query: str, k: int = 4):
+    if kb is None or not query or not query.strip():
+        return []
+    try:
+        return kb.search(query, k=k)
+    except Exception:
+        return []
 
 def fmt_money(x: float) -> str:
     try:
@@ -177,8 +218,25 @@ def ask(request: Request, query: str = Form(...)):
         "Desired_Savings": dsv, "Occupation": None, "City_Tier": None,
     }
     df = pd.DataFrame([row])
+
     out = run_advice_engine(df)
     cols = ["Pred_Savings_XGB"] + [c for c in ["Cluster", "Persona", "Goal_Prob", "Goal_Label"] if c in out.columns]
     result = clean_result_for_view(out[cols].iloc[0].to_dict())
     advice = make_advice(out.iloc[0])
-    return templates.TemplateResponse("index.html", {"request": request, "result": result, "advice": advice})
+
+    kb_query = query
+    ql = query.lower()
+    if any(k in ql for k in ["save", "spend", "budget", "expenses", "cost"]):
+        kb_query = "budgeting 50/30/20 saving save more monthly expenses groceries transport entertainment emergency fund"
+
+    snippets = retrieve_snippets(kb_query, k=3)
+
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "result": result,
+            "advice": advice,
+            "snippets": snippets,   # ← pass to template (optional)
+        },
+    )

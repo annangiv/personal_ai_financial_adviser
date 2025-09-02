@@ -16,7 +16,11 @@ dependencies = [
   "fastapi",
   "uvicorn",
   "jinja2",
-  "python-multipart"
+  "python-multipart",
+  "chromadb",
+  "sentence-transformers",
+  "PyYAML",
+  "markdown"
 ]
 
 [tool.setuptools]

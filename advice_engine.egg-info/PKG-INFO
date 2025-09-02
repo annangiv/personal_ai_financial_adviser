@@ -12,3 +12,7 @@ Requires-Dist: fastapi
 Requires-Dist: uvicorn
 Requires-Dist: jinja2
 Requires-Dist: python-multipart
+Requires-Dist: chromadb
+Requires-Dist: sentence-transformers
+Requires-Dist: PyYAML
+Requires-Dist: markdown
