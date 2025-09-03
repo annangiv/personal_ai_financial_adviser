@@ -198,54 +198,29 @@ def _build_render_chain():
     llm = _LocalLLM.get()
     template = (
         "You are a friendly financial coach in India.\n"
-        "Below are raw knowledge notes—use them only as background.\n\n"
-        "NOTES:\n"
-        "{kb_points}\n\n"
-        "TASK:\n"
-        "Write exactly 2 clear sentences (45–90 words).\n"
-        "- Summarize the notes in your own words, no verbatim copying.\n"
-        "- Mention the predicted_savings ({predicted_savings} ₹).\n"
-        "- Give 1–2 actionable tips.\n"
-        "- No lists, no quotes, no emojis.\n\n"
-        "ANSWER:\n"
+        "Write ONLY the advice in 2–3 sentences. Do not repeat these instructions, "
+        "do not say 'Answer:', and do not mention the notes.\n\n"
+        "Inputs:\n"
+        "- predicted_savings: {predicted_savings}\n"
+        "- persona: {persona}\n"
+        "- notes:\n{kb_points}\n\n"
+        "Answer:"
     )
     prompt = PromptTemplate.from_template(template)
-
-    # Wrap in a small lambda so we can pass in fallback at call time
-    def _post(llm_out, **kwargs):
-        ps = kwargs.get("predicted_savings") or "₹0"
-        persona = kwargs.get("persona") or "your profile"
-        fb = (f"Based on your numbers, you can save about {ps} per month. "
-              f"Cap wants near 30%, automate a monthly transfer on salary day, and review weekly to stay on track for {persona.lower()}.")
-        return _finalize_two_sentences(str(llm_out), fb)
-
-    # Return a callable chain: when invoking, pass the same inputs again for fallback text
-    return prompt | llm | (lambda x, **kw: _post(x, **kw))
+    return prompt | llm
 
 def _build_knowledge_chain():
     llm = _LocalLLM.get()
     template = (
         "You are a concise Indian financial coach.\n"
-        "Use the background notes below only for context.\n\n"
-        "QUESTION:\n"
-        "{question}\n\n"
-        "NOTES (for your eyes only):\n"
-        "{kb_points}\n\n"
-        "TASK:\n"
-        "Write exactly 2 sentences (45–90 words), practical and India-specific (₹ when relevant).\n"
-        "- Paraphrase; do not copy sentences.\n"
-        "- If the notes don’t mention something, say you don’t know.\n"
-        "- No lists, no quotes, no emojis.\n\n"
-        "FINAL ANSWER:\n"
+        "Using the notes only as background, answer the question.\n"
+        "Write ONLY the answer in 2 sentences. Do not repeat these instructions.\n\n"
+        "Question: {question}\n\n"
+        "Notes:\n{kb_points}\n\n"
+        "Answer:"
     )
     prompt = PromptTemplate.from_template(template)
-
-    def _post(llm_out, **kwargs):
-        fb = ("I don’t have enough detail in the notes to answer precisely. "
-              "Broadly, keep needs near 50%, wants near 30%, and route 20%+ to savings or debt; adjust for your city and obligations.")
-        return _finalize_two_sentences(str(llm_out), fb)
-
-    return prompt | llm | (lambda x, **kw: _post(x, **kw))
+    return prompt | llm
 
 # -------------------------
 # 4) Utility: unify to monthly
@@ -411,17 +386,23 @@ class AdvisorLLM:
                 "question": query,
                 "kb_points": kb_points
             })
-            
+
             # Create a simple result for consistency in UI
             result = {
-                "Question_Type": "knowledge_query", 
+                "Question_Type": "knowledge_query",
                 "Topic": snippets[0].get("metadata", {}).get("title", "Financial Knowledge")
             }
-            
+
+            # Clean + constrain to 2 sentences with a sane fallback
+            fallback = ("I don’t have enough detail to be precise. "
+                        "Broadly, aim for 50/30/20 (needs/wants/saving), automate SIPs, "
+                        "and adjust for your city and obligations.")
+            clean = _finalize_two_sentences(_strip_prompt_artifacts(str(answer)), fallback)
+
             return {
                 "result": result,
                 "snippets": snippets,
-                "advice": str(answer)
+                "advice": clean,
             }
         except Exception as e:
             logger.error(f"Knowledge chain failed: {e}")
@@ -716,14 +697,17 @@ class AdvisorLLM:
                 advice = str(llm.invoke(prompt)).strip()
             else:
                 # Use the standard render chain for other financial analysis
-                kb_points = "; ".join(s["text"][:100].replace("\n", " ") for s in snippets[:2])
-                render = self.render_chain.invoke({
+                render_out = self.render_chain.invoke({
                     "predicted_savings": result.get("Pred_Savings_XGB"),
                     "persona": result.get("Persona") or "Unknown",
                     "kb_points": kb_points[:200] or "No additional context.",
                 })
-                advice = str(render).strip()
-                
+                fallback = (
+                    f"Based on your numbers, you can save about {result.get('Pred_Savings_XGB','₹0')} per month. "
+                    f"Cap wants near 30%, automate a salary-day transfer, and review weekly for { (result.get('Persona') or 'your profile').lower() }."
+                )
+                advice = _finalize_two_sentences(str(render_out), fallback)
+
             logger.info(f"Generated advice: {advice}")
         except Exception as e:
             logger.error(f"Failed to generate advice: {e}")
