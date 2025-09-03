@@ -150,14 +150,14 @@ def _build_parse_chain():
     # Simplified prompt to reduce token length
     template = """Extract income, spend, and goal numbers from this question:
 
-    {question}
+{question}
 
-    Format as JSON:
-    {format_instructions}
+Format as JSON:
+{format_instructions}
 
-    For example, "I earn 80k/year and spend 50k" would be:
-    {"income_value": 80000, "income_period": "annual", "spend_value": 50000}
-    """
+For example, "I earn 80k/year and spend 50k" would be:
+{"income_value": 80000, "income_period": "annual", "spend_value": 50000}
+"""
     prompt = PromptTemplate(
         template=template,
         input_variables=["question"],
@@ -167,18 +167,20 @@ def _build_parse_chain():
 
 def _build_render_chain():
     llm = _LocalLLM.get()
-    # Force paraphrasing: 2 concise sentences, use numbers, no copy/paste.
+    # Prompt uses sections + explicit "Answer:" tag so the model doesn't echo instructions.
     template = (
-        "You are a financial coach. Write a short, friendly explanation for an Indian user.\n"
-        "Inputs:\n"
-        "- predicted_savings: {predicted_savings}\n"
-        "- persona: {persona}\n"
-        "- context (notes from knowledge base): {kb_points}\n\n"
-        "Constraints:\n"
-        "- Paraphrase the context in your own words; do NOT copy any phrases verbatim.\n"
-        "- Write exactly 2 concise sentences (45–90 words total).\n"
-        "- Reference the predicted_savings clearly in ₹ and give 1–2 actionable tips.\n"
-        "- No lists, no quotes, no emojis.\n"
+        "You are a concise Indian financial coach.\n"
+        "Use the inputs to craft advice for the user.\n\n"
+        "== Inputs ==\n"
+        "predicted_savings: {predicted_savings}\n"
+        "persona: {persona}\n"
+        "kb_notes: {kb_points}\n\n"
+        "== Guidelines ==\n"
+        "- Paraphrase kb_notes in your own words; do not copy phrases.\n"
+        "- Exactly 2 sentences total (about 45–90 words).\n"
+        "- Mention predicted_savings in ₹ and give 1–2 practical tips.\n"
+        "- No lists, no bullet points, no quotes, no emojis.\n\n"
+        "== Answer ==\n"
     )
     prompt = PromptTemplate.from_template(template)
     return prompt | llm
@@ -187,19 +189,20 @@ def _build_knowledge_chain():
     llm = _LocalLLM.get()
     template = (
         "You are a concise Indian financial coach.\n"
-        "Task: Answer the user's question using ONLY the knowledge points below.\n"
-        "Question: {question}\n\n"
-        "Knowledge points (notes; may be partial):\n"
+        "Answer the user's question using only the knowledge notes.\n\n"
+        "== Question ==\n"
+        "{question}\n\n"
+        "== Knowledge notes ==\n"
         "{kb_points}\n\n"
-        "Constraints:\n"
-        "- Paraphrase in your own words; do NOT copy phrases verbatim from the notes.\n"
-        "- If a detail is not present in the notes, say you don't have that info.\n"
-        "- Write exactly 2 sentences (45–90 words total), practical and specific for India (₹ where relevant).\n"
-        "- No lists, no quotations, no emojis, no marketing tone."
+        "== Guidelines ==\n"
+        "- Paraphrase; do not copy sentences from the notes.\n"
+        "- If a detail isn't in the notes, say you don't have that info.\n"
+        "- Exactly 2 sentences (45–90 words), practical, India-specific (₹ if relevant).\n"
+        "- No lists, no quotes, no emojis.\n\n"
+        "== Answer ==\n"
     )
     prompt = PromptTemplate.from_template(template)
     return prompt | llm
-
 
 # -------------------------
 # 4) Utility: unify to monthly
