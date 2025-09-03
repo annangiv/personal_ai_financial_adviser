@@ -1,7 +1,13 @@
 # streamlit_app.py
-import streamlit as st
+try:
+    import pysqlite3
+    import sys
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+except Exception:
+    pass
 
-from llm_layer import AdvisorLLM  # <- NEW: lightweight LLM-ish orchestrator
+import streamlit as st
+from llm_layer import AdvisorLLM
 
 # --- Page config ---
 st.set_page_config(page_title="Financial Advice Engine", layout="centered")
@@ -9,7 +15,6 @@ st.set_page_config(page_title="Financial Advice Engine", layout="centered")
 st.title("💸 Financial Advice Engine")
 st.markdown("Ask me about your income, expenses, or financial goals:")
 
-# Keep a single retriever/LLM instance across reruns
 if "advisor_llm" not in st.session_state:
     st.session_state.advisor_llm = AdvisorLLM()
 llm = st.session_state.advisor_llm
