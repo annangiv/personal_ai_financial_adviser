@@ -141,23 +141,33 @@ class _LocalLLM:
         return cls._singleton
     
 def _strip_prompt_artifacts(text: str) -> str:
-    """
-    Remove stray prompt instructions or scaffolding that the LLM may echo.
-    """
     if not text:
-        return text
+        return ""
+    t = text
 
-    # Remove common instruction leaks like TASK:, NOTES:, GUIDELINES:
-    text = re.sub(r"(NOTES|TASK|GUIDELINES|ANSWER|FINAL ANSWER)[:\s]*", "", text, flags=re.I)
+    # Strip common scaffold words if they leak
+    t = re.sub(r"(?i)\b(NOTES?|TASK|GUIDELINES?|ANSWER|FINAL ANSWER)\b\s*:?", " ", t)
+    t = re.sub(r"==+\s*[^=]+==+", " ", t)
 
-    # Remove leftover "Write exactly ..." type instructions
-    text = re.sub(r"Write\s+exactly.*", "", text, flags=re.I)
+    # If any “Write …” instruction leaked, drop everything from there
+    t = re.split(r"(?i)\bwrite\s+exactly\b", t)[0]
+    t = re.split(r"(?i)\bwrite\s+\d+\s*(?:sentences?|lines?)\b", t)[0]
 
-    # Remove "== ... ==" markers
-    text = re.sub(r"==+\s*[^=]+==+", "", text)
+    # Collapse whitespace
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
 
-    # Clean whitespace
-    return text.strip()
+def _finalize_two_sentences(text: str, fallback: str) -> str:
+    """
+    Keep only the first two sentences. If too short/empty, return fallback.
+    """
+    t = _strip_prompt_artifacts(text)
+    # Split on sentence boundaries
+    sents = re.split(r'(?<=[.!?])\s+', t)
+    t2 = " ".join(sents[:2]).strip()
+    if len(t2.split()) < 10:
+        return fallback
+    return t2
 
 # -------------------------
 # 3) Chains: parse + render + knowledge
@@ -188,7 +198,7 @@ def _build_render_chain():
     llm = _LocalLLM.get()
     template = (
         "You are a friendly financial coach in India.\n"
-        "Below are some raw knowledge notes. Use them only as background.\n\n"
+        "Below are raw knowledge notes—use them only as background.\n\n"
         "NOTES:\n"
         "{kb_points}\n\n"
         "TASK:\n"
@@ -200,7 +210,17 @@ def _build_render_chain():
         "ANSWER:\n"
     )
     prompt = PromptTemplate.from_template(template)
-    return prompt | llm | _strip_prompt_artifacts
+
+    # Wrap in a small lambda so we can pass in fallback at call time
+    def _post(llm_out, **kwargs):
+        ps = kwargs.get("predicted_savings") or "₹0"
+        persona = kwargs.get("persona") or "your profile"
+        fb = (f"Based on your numbers, you can save about {ps} per month. "
+              f"Cap wants near 30%, automate a monthly transfer on salary day, and review weekly to stay on track for {persona.lower()}.")
+        return _finalize_two_sentences(str(llm_out), fb)
+
+    # Return a callable chain: when invoking, pass the same inputs again for fallback text
+    return prompt | llm | (lambda x, **kw: _post(x, **kw))
 
 def _build_knowledge_chain():
     llm = _LocalLLM.get()
@@ -212,15 +232,20 @@ def _build_knowledge_chain():
         "NOTES (for your eyes only):\n"
         "{kb_points}\n\n"
         "TASK:\n"
-        "Write exactly 2 sentences (45–90 words).\n"
-        "- Summarize in your own words (no verbatim copying).\n"
+        "Write exactly 2 sentences (45–90 words), practical and India-specific (₹ when relevant).\n"
+        "- Paraphrase; do not copy sentences.\n"
         "- If the notes don’t mention something, say you don’t know.\n"
-        "- Keep it practical, India-specific (₹ where relevant).\n"
         "- No lists, no quotes, no emojis.\n\n"
         "FINAL ANSWER:\n"
     )
     prompt = PromptTemplate.from_template(template)
-    return prompt | llm | _strip_prompt_artifacts
+
+    def _post(llm_out, **kwargs):
+        fb = ("I don’t have enough detail in the notes to answer precisely. "
+              "Broadly, keep needs near 50%, wants near 30%, and route 20%+ to savings or debt; adjust for your city and obligations.")
+        return _finalize_two_sentences(str(llm_out), fb)
+
+    return prompt | llm | (lambda x, **kw: _post(x, **kw))
 
 # -------------------------
 # 4) Utility: unify to monthly
