@@ -10,12 +10,13 @@ LangChain-powered 'LLM layer' (LOCAL ONLY, no external APIs).
 You can keep Streamlit exactly the same; just call AdvisorLLM().answer(query)
 """
 
-import torch
 from typing import Optional, Dict, Any, Union
 import math
 import pandas as pd
 import logging
 import re
+import os
+import torch  # <-- added
 
 # Your existing modules
 from advice_engine.pipeline import run_advice_engine
@@ -100,7 +101,7 @@ def _token_to_num(tok: str) -> float | None:
     return val
 
 # -------------------------
-# 2) Local LLM (flan-t5-base)
+# 2) Local LLM (flan-t5-base) — CPU-safe loading
 # -------------------------
 class _LocalLLM:
     _singleton = None
@@ -109,12 +110,36 @@ class _LocalLLM:
     def get(cls):
         if cls._singleton is None:
             model_name = "google/flan-t5-base"
+
+            # (optional) set caches if provided by environment (no hard requirement)
+            os.environ.setdefault("HF_HOME", os.getenv("HF_HOME", "/mount/data/hf"))
+            os.environ.setdefault("TRANSFORMERS_CACHE", os.getenv("TRANSFORMERS_CACHE", "/mount/data/hf/transformers"))
+            try:
+                os.makedirs(os.environ["HF_HOME"], exist_ok=True)
+                os.makedirs(os.environ["TRANSFORMERS_CACHE"], exist_ok=True)
+            except Exception:
+                pass
+
             tok = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-            mdl = AutoModelForSeq2SeqLM.from_pretrained(model_name, device_map="cpu", torch_dtype=torch.float32, low_cpu_mem_usage=False)
-            # Set max_length parameter to avoid the sequence length error
-            gen = hf_pipeline("text2text-generation", model=mdl, tokenizer=tok, 
-                             device=-1, max_new_tokens=256, max_length=512)
+
+            # IMPORTANT: eager load on CPU, no meta tensors / no device_map tricks
+            mdl = AutoModelForSeq2SeqLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.float32,   # avoid fp16 on CPU
+                low_cpu_mem_usage=False      # avoid meta tensors path
+            )
+            mdl.to("cpu")  # explicit CPU
+
+            gen = hf_pipeline(
+                "text2text-generation",
+                model=mdl,
+                tokenizer=tok,
+                device=-1,                   # CPU
+                max_new_tokens=256,
+                max_length=512
+            )
             cls._singleton = HuggingFacePipeline(pipeline=gen)
+            logger.info("LLM loaded on CPU (eager); low_cpu_mem_usage=False; device=-1")
         return cls._singleton
 
 # -------------------------
