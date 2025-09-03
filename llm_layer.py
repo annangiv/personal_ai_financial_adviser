@@ -126,7 +126,6 @@ class _LocalLLM:
             low_cpu_mem_usage=False,
             **auth,
         )
-        mdl.to("cpu")
 
         gen = hf_pipeline(
             "text2text-generation",
