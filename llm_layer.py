@@ -44,7 +44,7 @@ class ParsedQuery(BaseModel):
     goal_value: Optional[float]   = Field(None, description="Desired savings numeric value if present")
     goal_period: Optional[str]    = Field(None, description="goal period: 'monthly' or 'annual' if present")
 
-    @validator("income_period", "spend_period", "goal_period")
+    @validator("income_period", "spend_period", "goal_period", allow_reuse=True)
     def norm_period(cls, v):
         if v is None:
             return None
