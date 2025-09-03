@@ -10,6 +10,7 @@ LangChain-powered 'LLM layer' (LOCAL ONLY, no external APIs).
 You can keep Streamlit exactly the same; just call AdvisorLLM().answer(query)
 """
 
+import torch
 from typing import Optional, Dict, Any, Union
 import math
 import pandas as pd
@@ -108,11 +109,11 @@ class _LocalLLM:
     def get(cls):
         if cls._singleton is None:
             model_name = "google/flan-t5-base"
-            tok = AutoTokenizer.from_pretrained(model_name)
-            mdl = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+            tok = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+            mdl = AutoModelForSeq2SeqLM.from_pretrained(model_name, device_map="cpu", torch_dtype=torch.float32, low_cpu_mem_usage=False)
             # Set max_length parameter to avoid the sequence length error
             gen = hf_pipeline("text2text-generation", model=mdl, tokenizer=tok, 
-                             max_new_tokens=256, max_length=512)
+                             device=-1, max_new_tokens=256, max_length=512)
             cls._singleton = HuggingFacePipeline(pipeline=gen)
         return cls._singleton
 

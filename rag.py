@@ -23,7 +23,7 @@ class KBRetriever:
     def __init__(self, db_dir: str = KB_DB_DIR, collection: str = KB_COLLECTION, model: str = EMBED_MODEL):
         self.client = chromadb.PersistentClient(path=db_dir)
         self.coll = self.client.get_collection(collection)
-        self.embedder = SentenceTransformer(model)
+        self.embedder = SentenceTransformer(model, device="cpu")
 
     def search(self, query: str, k: int = 4):
         qvec = self.embedder.encode([query], normalize_embeddings=True).tolist()
