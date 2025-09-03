@@ -139,6 +139,22 @@ class _LocalLLM:
         )
         cls._singleton = HuggingFacePipeline(pipeline=gen)
         return cls._singleton
+    
+def _strip_prompt_artifacts(text: str) -> str:
+    """
+    Clean up any stray prompt scaffolding that the model might echo.
+    """
+    if not text:
+        return text
+
+    # Remove sections like NOTES:, TASK:, GUIDELINES:, FINAL ANSWER:
+    text = re.sub(r"(NOTES|TASK|GUIDELINES|FINAL ANSWER)\s*:\s*", "", text, flags=re.I)
+
+    # Remove == markers if they sneak in
+    text = re.sub(r"==+\s*[^=]+==+", "", text)
+
+    # Trim leading/trailing whitespace
+    return text.strip()
 
 # -------------------------
 # 3) Chains: parse + render + knowledge
@@ -167,42 +183,41 @@ For example, "I earn 80k/year and spend 50k" would be:
 
 def _build_render_chain():
     llm = _LocalLLM.get()
-    # Prompt uses sections + explicit "Answer:" tag so the model doesn't echo instructions.
     template = (
-        "You are a concise Indian financial coach.\n"
-        "Use the inputs to craft advice for the user.\n\n"
-        "== Inputs ==\n"
-        "predicted_savings: {predicted_savings}\n"
-        "persona: {persona}\n"
-        "kb_notes: {kb_points}\n\n"
-        "== Guidelines ==\n"
-        "- Paraphrase kb_notes in your own words; do not copy phrases.\n"
-        "- Exactly 2 sentences total (about 45–90 words).\n"
-        "- Mention predicted_savings in ₹ and give 1–2 practical tips.\n"
-        "- No lists, no bullet points, no quotes, no emojis.\n\n"
-        "== Answer ==\n"
+        "You are a friendly financial coach in India.\n"
+        "Below are some raw knowledge notes. Use them only as background.\n\n"
+        "NOTES:\n"
+        "{kb_points}\n\n"
+        "TASK:\n"
+        "Write exactly 2 clear sentences (45–90 words).\n"
+        "- Summarize the notes in your own words, no verbatim copying.\n"
+        "- Mention the predicted_savings ({predicted_savings} ₹).\n"
+        "- Give 1–2 actionable tips.\n"
+        "- No lists, no quotes, no emojis.\n\n"
+        "ANSWER:\n"
     )
     prompt = PromptTemplate.from_template(template)
-    return prompt | llm
+    return prompt | llm | _strip_prompt_artifacts
 
 def _build_knowledge_chain():
     llm = _LocalLLM.get()
     template = (
         "You are a concise Indian financial coach.\n"
-        "Answer the user's question using only the knowledge notes.\n\n"
-        "== Question ==\n"
+        "Use the background notes below only for context.\n\n"
+        "QUESTION:\n"
         "{question}\n\n"
-        "== Knowledge notes ==\n"
+        "NOTES (for your eyes only):\n"
         "{kb_points}\n\n"
-        "== Guidelines ==\n"
-        "- Paraphrase; do not copy sentences from the notes.\n"
-        "- If a detail isn't in the notes, say you don't have that info.\n"
-        "- Exactly 2 sentences (45–90 words), practical, India-specific (₹ if relevant).\n"
+        "TASK:\n"
+        "Write exactly 2 sentences (45–90 words).\n"
+        "- Summarize in your own words (no verbatim copying).\n"
+        "- If the notes don’t mention something, say you don’t know.\n"
+        "- Keep it practical, India-specific (₹ where relevant).\n"
         "- No lists, no quotes, no emojis.\n\n"
-        "== Answer ==\n"
+        "FINAL ANSWER:\n"
     )
     prompt = PromptTemplate.from_template(template)
-    return prompt | llm
+    return prompt | llm | _strip_prompt_artifacts
 
 # -------------------------
 # 4) Utility: unify to monthly
