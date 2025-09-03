@@ -106,41 +106,71 @@ def _token_to_num(tok: str) -> float | None:
 class _LocalLLM:
     _singleton = None
 
-    @classmethod
-    def get(cls):
-        if cls._singleton is None:
-            model_name = "google/flan-t5-base"
+@classmethod
+def get(cls):
+    if cls._singleton is not None:
+        return cls._singleton
 
-            # (optional) set caches if provided by environment (no hard requirement)
-            os.environ.setdefault("HF_HOME", os.getenv("HF_HOME", "/mount/data/hf"))
-            os.environ.setdefault("TRANSFORMERS_CACHE", os.getenv("TRANSFORMERS_CACHE", "/mount/data/hf/transformers"))
-            try:
-                os.makedirs(os.environ["HF_HOME"], exist_ok=True)
-                os.makedirs(os.environ["TRANSFORMERS_CACHE"], exist_ok=True)
-            except Exception:
-                pass
+    import os, torch, logging
+    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline as hf_pipeline
 
-            tok = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+    logger = logging.getLogger(__name__)
 
-            # IMPORTANT: eager load on CPU, no meta tensors / no device_map tricks
+    # Persist caches on Streamlit Cloud (safe locally too)
+    os.environ.setdefault("HF_HOME", os.getenv("HF_HOME", "/mount/data/hf"))
+    os.environ.setdefault("TRANSFORMERS_CACHE", os.getenv("TRANSFORMERS_CACHE", "/mount/data/hf/transformers"))
+    for p in (os.environ["HF_HOME"], os.environ["TRANSFORMERS_CACHE"]):
+        try:
+            os.makedirs(p, exist_ok=True)
+        except Exception:
+            pass
+
+    # Optional HF auth to avoid 429 rate limits
+    hf_token = (
+        os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+    )
+    auth_kw = {"token": hf_token} if hf_token else {}
+
+    candidates = [
+        "google/flan-t5-base",   # best quality, bigger (~900MB)
+        "google/flan-t5-small",  # lighter (~300MB)
+        "sshleifer/tiny-t5",     # tiny fallback (for debug only)
+    ]
+
+    last_err = None
+    for model_name in candidates:
+        try:
+            logger.info(f"Trying to load model: {model_name} (CPU)")
+            tok = AutoTokenizer.from_pretrained(model_name, use_fast=True, **auth_kw)
             mdl = AutoModelForSeq2SeqLM.from_pretrained(
                 model_name,
-                torch_dtype=torch.float32,   # avoid fp16 on CPU
-                low_cpu_mem_usage=False      # avoid meta tensors path
+                torch_dtype=torch.float32,   # CPU-friendly
+                low_cpu_mem_usage=False,     # avoid meta tensors
+                **auth_kw
             )
             mdl.to("cpu")  # explicit CPU
-
             gen = hf_pipeline(
                 "text2text-generation",
                 model=mdl,
                 tokenizer=tok,
                 device=-1,                   # CPU
                 max_new_tokens=256,
-                max_length=512
+                max_length=512,
             )
+            from langchain_huggingface import HuggingFacePipeline
             cls._singleton = HuggingFacePipeline(pipeline=gen)
-            logger.info("LLM loaded on CPU (eager); low_cpu_mem_usage=False; device=-1")
-        return cls._singleton
+            logger.info(f"LLM loaded on CPU: {model_name}")
+            return cls._singleton
+        except Exception as e:
+            last_err = e
+            logger.warning(f"Failed to load {model_name}: {e}")
+
+    raise RuntimeError(
+        "Could not load any T5 model (base/small/tiny). "
+        "If you're on Streamlit Cloud, add an HF token to secrets as HF_TOKEN to avoid rate limits. "
+        f"Last error: {last_err}"
+    )
+
 
 # -------------------------
 # 3) Chains: parse + render + knowledge
