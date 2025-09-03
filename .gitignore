@@ -1,2 +1,2 @@
 /.venv
-/advisor_env
+/advisor_env.streamlit/secrets.toml
