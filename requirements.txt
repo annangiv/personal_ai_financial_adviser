@@ -1,5 +1,4 @@
 accelerate==1.10.1
--e git+https://github.com/annangiv/personal_ai_financial_adviser.git@3c3c9dd247584ed3f8be117286a3ed2271ce05bb#egg=advice_engine
 altair==5.5.0
 annotated-types==0.7.0
 anyio==4.10.0
