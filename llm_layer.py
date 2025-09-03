@@ -115,7 +115,7 @@ class _LocalLLM:
         from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline as hf_pipeline
         from langchain_huggingface import HuggingFacePipeline
 
-        model_name = "google/flan-t5-small"  # light + free
+        model_name = "google/flan-t5-base" 
         token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
         auth = {"token": token} if token else {}
 
@@ -132,8 +132,12 @@ class _LocalLLM:
             model=mdl,
             tokenizer=tok,
             device=-1,          # CPU
-            max_new_tokens=256,
-            max_length=512,
+            max_new_tokens=120,
+            do_sample=False,
+            temperature=0.0,
+            top_k=0,
+            repetition_penalty=1.2,
+            no_repeat_ngram_size=4,
         )
         cls._singleton = HuggingFacePipeline(pipeline=gen)
         return cls._singleton
