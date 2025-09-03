@@ -3,6 +3,9 @@ import os, glob, re, uuid, yaml
 from dataclasses import dataclass
 from typing import List, Dict, Any
 
+import sys, pysqlite3
+sys.modules["sqlite3"] = pysqlite3
+
 import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
@@ -12,8 +15,8 @@ from markdown import markdown
 KB_DIR = "kb"
 DB_DIR = "vectordb"
 COLLECTION = "finance_kb"
-EMBED_MODEL = "all-MiniLM-L6-v2"  # small, fast, good enough to start
-CHUNK_SIZE = 600   # characters per chunk
+EMBED_MODEL = "all-MiniLM-L6-v2"  
+CHUNK_SIZE = 600   
 CHUNK_OVERLAP = 80
 
 # -------- helpers --------
