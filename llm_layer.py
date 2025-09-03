@@ -142,18 +142,21 @@ class _LocalLLM:
     
 def _strip_prompt_artifacts(text: str) -> str:
     """
-    Clean up any stray prompt scaffolding that the model might echo.
+    Remove stray prompt instructions or scaffolding that the LLM may echo.
     """
     if not text:
         return text
 
-    # Remove sections like NOTES:, TASK:, GUIDELINES:, FINAL ANSWER:
-    text = re.sub(r"(NOTES|TASK|GUIDELINES|FINAL ANSWER)\s*:\s*", "", text, flags=re.I)
+    # Remove common instruction leaks like TASK:, NOTES:, GUIDELINES:
+    text = re.sub(r"(NOTES|TASK|GUIDELINES|ANSWER|FINAL ANSWER)[:\s]*", "", text, flags=re.I)
 
-    # Remove == markers if they sneak in
+    # Remove leftover "Write exactly ..." type instructions
+    text = re.sub(r"Write\s+exactly.*", "", text, flags=re.I)
+
+    # Remove "== ... ==" markers
     text = re.sub(r"==+\s*[^=]+==+", "", text)
 
-    # Trim leading/trailing whitespace
+    # Clean whitespace
     return text.strip()
 
 # -------------------------
